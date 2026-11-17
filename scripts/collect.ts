@@ -8,6 +8,7 @@ if (!Number.isFinite(minimum) || minimum < 0)
 const ac = new AbortController(),
   snapshot: Snapshot = {
     version: 1,
+    marketClassification: "symbolType",
     generatedAt: new Date().toISOString(),
     minTurnover: minimum,
     targetCount: 0,
@@ -16,7 +17,7 @@ const ac = new AbortController(),
     entries: [],
   };
 try {
-  const targets = await markets(minimum, ac.signal);
+  const targets = await markets(minimum, ac.signal, "all");
   snapshot.targetCount = targets.length;
   if (!targets.length)
     throw new Error("No market targets; refusing to replace cache");
@@ -31,7 +32,11 @@ try {
         } catch (e) {
           if (ac.signal.aborted) return;
           const message = e instanceof Error ? e.message : String(e);
-          snapshot.failed.push({ symbol: market.symbol, message });
+          snapshot.failed.push({
+            symbol: market.symbol,
+            symbolType: market.symbolType,
+            message,
+          });
           if (e instanceof ApiError && e.fatal) {
             snapshot.fatal = message;
             ac.abort();

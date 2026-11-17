@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { loadSnapshot, scan } from "./lib/scanner";
+import { loadMarketFilter, saveMarketFilter, marketLabels } from "./lib/market";
+import type { MarketFilter } from "./lib/market";
+import { filterSnapshot, loadSnapshot, scan } from "./lib/scanner";
 import type { Progress } from "./lib/scanner";
 import { detectPatterns, selectPattern } from "./lib/detector";
 import { rank, stageLabel } from "./lib/types";
@@ -7,6 +9,9 @@ import type { ScanResult, Stage } from "./lib/types";
 import ResultCard, { kst } from "./components/ResultCard";
 const initial: Progress = { total: 0, completed: 0, found: 0, errors: [] };
 export default function App() {
+  const [marketFilter, setMarketFilter] =
+    useState<MarketFilter>(loadMarketFilter);
+  useEffect(() => saveMarketFilter(marketFilter), [marketFilter]);
   const [turnover, setTurnover] = useState(10),
     [custom, setCustom] = useState("10"),
     [preset, setPreset] = useState("10");
@@ -100,9 +105,8 @@ export default function App() {
         setStatus("공개 캐시 다운로드 및 실제 캔들 재분석 중…");
         const snapshot = await loadSnapshot(ac.signal);
         setCacheFloor(snapshot.minTurnover);
-        const entries = snapshot.entries.filter(
-          (e) => e.market.turnover >= turnover * 1e6,
-        );
+        const selected = filterSnapshot(snapshot, marketFilter, turnover * 1e6);
+        const entries = selected.entries;
         const output: ScanResult[] = [];
         for (let i = 0; i < entries.length; i++) {
           if (ac.signal.aborted) throw new DOMException("중지", "AbortError");
@@ -119,12 +123,12 @@ export default function App() {
         saved.current = output;
         setResults(output);
         setProgress({
-          total: snapshot.targetCount,
-          completed: snapshot.completed,
+          total: selected.total,
+          completed: selected.completed,
           found: output.filter((r) =>
             selectPattern(r.patterns, r.candles.length),
           ).length,
-          errors: snapshot.failed,
+          errors: selected.errors,
         });
         setUpdated(Date.parse(snapshot.generatedAt));
         setActualSource("cache");
@@ -135,15 +139,20 @@ export default function App() {
       } else {
         setActualSource("live");
         setStatus("Bybit 종목 목록 및 거래대금 확인 중…");
-        const final = await scan(turnover * 1e6, ac.signal, (p, result) => {
-          setProgress(p);
-          if (result) {
-            saved.current.push(result);
-            setResults([...saved.current]);
-            setUpdated(Date.now());
-          }
-          setStatus(`실제 15분봉 분석 중 · ${p.completed} / ${p.total}`);
-        });
+        const final = await scan(
+          turnover * 1e6,
+          ac.signal,
+          (p, result) => {
+            setProgress(p);
+            if (result) {
+              saved.current.push(result);
+              setResults([...saved.current]);
+              setUpdated(Date.now());
+            }
+            setStatus(`실제 15분봉 분석 중 · ${p.completed} / ${p.total}`);
+          },
+          marketFilter,
+        );
         setStatus(
           final.total === 0
             ? "거래대금 조건에 맞는 대상 종목이 없습니다."
@@ -199,6 +208,38 @@ export default function App() {
             </h2>
             <span className="muted">BTC · ETH 제외</span>
           </div>
+          <fieldset className="market-selector" disabled={running}>
+            <legend>탐색 시장</legend>
+            <div className="market-options">
+              {(["crypto", "stock", "all"] as const).map((value) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={marketFilter === value}
+                  className={marketFilter === value ? "selected" : ""}
+                  onClick={() => {
+                    setMarketFilter(value);
+                    setResults([]);
+                    setProgress(initial);
+                    setUpdated(undefined);
+                    setError("");
+                    setCacheFloor(undefined);
+                    setActualSource("");
+                    setVisible(5);
+                    setStatus(
+                      `${marketLabels[value]} 선택 · 검색 시작을 눌러주세요.`,
+                    );
+                  }}
+                >
+                  {marketLabels[value]}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <p className="note market-note">
+            주식만은 Bybit의 개별 주식 기반 무기한 선물입니다.
+            ETF·원자재·외환·미분류는 전체에 포함됩니다.
+          </p>
           <div className="settings-grid">
             <label>
               최소 24H 거래대금
@@ -354,6 +395,7 @@ export default function App() {
           <div className="status-title">
             <span className={running ? "status-dot active" : "status-dot"} />
             <strong>{status}</strong>
+            <span className="muted">{marketLabels[marketFilter]}</span>
             {actualSource && (
               <span className={`source-tag ${actualSource}`}>
                 {actualSource === "cache" ? "캐시 데이터" : "실시간 API"}
@@ -506,7 +548,8 @@ export default function App() {
           사용자에게 있습니다.
         </p>
         <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
-          TradingView Lightweight Charts™ · Copyright (с) 2025 TradingView, Inc.
+          TradingView Lightweight Charts™ · Copyright (с) 2025 TradingView,
+          Inc.
         </a>
       </footer>
     </div>

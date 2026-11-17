@@ -1,3 +1,4 @@
+import { assetLabel } from "../lib/market";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { Pattern, ScanResult } from "../lib/types";
 import { stageLabel } from "../lib/types";
@@ -102,7 +103,9 @@ export default function ResultCard({
             {result.symbol.replace(/USDT$/, "")}
             <small> / USDT</small>
           </h2>
-          <span className="muted">Bybit · USDT 무기한</span>
+          <span className="muted">
+            Bybit · USDT 무기한 · {assetLabel(result.symbolType)}
+          </span>
         </div>
         <div className="score">
           <strong>{fmt(p.scores.total, 1)}</strong>

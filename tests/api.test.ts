@@ -88,6 +88,7 @@ describe("Bybit errors and universe", () => {
   it("paginates and excludes BTC/ETH, non-USDT, non-perpetual, non-trading, and low turnover", async () => {
     const instrument = (symbol: string, extra = {}) => ({
       symbol,
+      symbolType: "",
       quoteCoin: "USDT",
       settleCoin: "USDT",
       status: "Trading",

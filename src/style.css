@@ -829,3 +829,30 @@ footer a {
     margin-left: 0.18em;
   }
 }
+.market-selector {
+  border: 0;
+  padding: 0;
+  margin: 0 0 8px;
+  min-width: 0;
+}
+.market-selector legend {
+  color: #9eb0c8;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.market-options {
+  display: flex;
+  gap: 8px;
+}
+.market-options button {
+  flex: 1;
+  max-width: 180px;
+}
+.market-options button.selected {
+  color: #38d9ad;
+  background: #14372f;
+  border-color: #38d9ad;
+}
+.market-note {
+  margin: 8px 0 22px;
+}

@@ -64,18 +64,28 @@ try {
     "DOGEUSDT",
     "AVAXUSDT",
   ];
+  const assets = [...symbols, "AAPLUSDT", "SPYUSDT"];
+  const symbolType = (symbol) =>
+    symbol === "AAPLUSDT" ? "stock" : symbol === "SPYUSDT" ? "ETF" : "";
+  assert.equal(
+    await page
+      .getByRole("button", { name: "코인만", exact: true })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
   await page.route("https://api.bybit.com/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     const list = path.endsWith("instruments-info")
-      ? symbols.map((symbol) => ({
+      ? assets.map((symbol) => ({
           symbol,
+          symbolType: symbolType(symbol),
           quoteCoin: "USDT",
           settleCoin: "USDT",
           status: "Trading",
           contractType: "LinearPerpetual",
         }))
       : path.endsWith("tickers")
-        ? symbols.map((symbol) => ({
+        ? assets.map((symbol) => ({
             symbol,
             lastPrice: "101.5",
             turnover24h: "35000000",
@@ -126,6 +136,26 @@ try {
   assert.equal(await page.locator(".result-card").count(), 0);
   await page.getByLabel("패턴 단계", { exact: true }).selectOption("all");
   assert.equal(await page.locator(".result-card").count(), 5);
+  await page.getByRole("button", { name: "주식만", exact: true }).click();
+  await page.reload();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "주식만", exact: true })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  await page.getByRole("button", { name: "⌕ 검색 시작" }).click();
+  await page
+    .getByText("검색 완료 · 1종목 분석 성공", { exact: true })
+    .waitFor();
+  assert.equal(await page.locator(".result-card").count(), 1);
+  assert.match(await page.locator(".result-card .card-top h2").innerText(), /AAPL/);
+  await page.getByRole("button", { name: "전체", exact: true }).click();
+  await page.getByRole("button", { name: "⌕ 검색 시작" }).click();
+  await page
+    .getByText("검색 완료 · 8종목 분석 성공", { exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "코인만", exact: true }).click();
   // Verify fatal HTTP error UX; pending-request cancellation is covered by scanner tests.
   await page.unroute("https://api.bybit.com/**");
   await page.route("https://api.bybit.com/**", (route) =>
@@ -154,13 +184,19 @@ try {
     route.fulfill({
       json: {
         version: 1,
+        marketClassification: "symbolType",
         generatedAt: new Date(candles.at(-1).time + 900000).toISOString(),
         minTurnover: 30000000,
         targetCount: 6,
         completed: 6,
         failed: [],
         entries: symbols.map((symbol) => ({
-          market: { symbol, price: 101.5, turnover: 35000000 },
+          market: {
+            symbol,
+            symbolType: symbolType(symbol),
+            price: 101.5,
+            turnover: 35000000,
+          },
           candles,
         })),
       },

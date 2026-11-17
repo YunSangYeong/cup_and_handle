@@ -14,6 +14,7 @@ function universe(url: string) {
     return response(
       symbols.map((symbol) => ({
         symbol,
+        symbolType: "",
         quoteCoin: "USDT",
         settleCoin: "USDT",
         contractType: "LinearPerpetual",
@@ -127,6 +128,7 @@ describe("bounded scan orchestration", () => {
 describe("public cache validation", () => {
   const snapshot = () => ({
     version: 1,
+    marketClassification: "symbolType",
     generatedAt: new Date(candles.at(-1)!.time + INTERVAL).toISOString(),
     minTurnover: 10000000,
     targetCount: 1,

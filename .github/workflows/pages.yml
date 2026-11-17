@@ -40,6 +40,11 @@ jobs:
             echo "No previous cache; attempting fresh public API collection"
             npm run collect || echo "Cache unavailable; UI will report this explicitly"
           fi
+      - name: Refresh legacy cache classification
+        run: |
+          if [ -f public/data/market.json ] && ! node --input-type=module -e 'import fs from "node:fs"; process.exit(JSON.parse(fs.readFileSync("public/data/market.json", "utf8")).marketClassification === "symbolType" ? 0 : 1)'; then
+            npm run collect || echo "Legacy cache retained; UI requires fresh classification for coin/stock mode"
+          fi
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

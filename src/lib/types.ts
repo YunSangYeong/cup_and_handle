@@ -7,6 +7,7 @@ export interface Candle {
   volume: number;
 }
 export interface Market {
+  symbolType?: string;
   symbol: string;
   turnover: number;
   price: number;
@@ -87,10 +88,12 @@ export interface ScanResult extends Market {
   issue?: string;
 }
 export interface Failure {
+  symbolType?: string;
   symbol: string;
   message: string;
 }
 export interface Snapshot {
+  marketClassification?: "symbolType";
   version: 1;
   generatedAt: string;
   minTurnover: number;

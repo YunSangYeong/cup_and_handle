@@ -1,3 +1,5 @@
+import { matchesMarket } from "./market";
+import type { MarketFilter } from "./market";
 import { INTERVAL } from "./types";
 import type { Candle, Market } from "./types";
 export class ApiError extends Error {
@@ -57,8 +59,9 @@ const record = (v: unknown): Record<string, unknown> => {
 export async function markets(
   minTurnover: number,
   signal?: AbortSignal,
+  marketFilter: MarketFilter = "crypto",
 ): Promise<Market[]> {
-  const instruments = new Set<string>();
+  const instruments = new Map<string, string | undefined>();
   let cursor = "";
   const seen = new Set<string>();
   do {
@@ -82,7 +85,10 @@ export async function markets(
         typeof r.symbol === "string" &&
         !["BTCUSDT", "ETHUSDT"].includes(r.symbol)
       )
-        instruments.add(r.symbol);
+        instruments.set(
+          r.symbol,
+          typeof r.symbolType === "string" ? r.symbolType : undefined,
+        );
     }
     cursor = page.nextPageCursor ?? "";
     if (cursor && seen.has(cursor))
@@ -99,6 +105,7 @@ export async function markets(
       const r = record(item);
       return {
         symbol: String(r.symbol),
+        symbolType: instruments.get(String(r.symbol)),
         price: Number(r.lastPrice),
         turnover: Number(r.turnover24h),
       };
@@ -106,6 +113,7 @@ export async function markets(
     .filter(
       (m) =>
         instruments.has(m.symbol) &&
+        matchesMarket(m.symbolType, marketFilter) &&
         Number.isFinite(m.turnover) &&
         m.turnover >= minTurnover &&
         Number.isFinite(m.price) &&

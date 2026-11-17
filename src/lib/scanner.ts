@@ -1,4 +1,6 @@
 import { ApiError, klines, markets, normalizeCandles } from "./api";
+import { matchesMarket } from "./market";
+import type { MarketFilter } from "./market";
 import { detectPatterns } from "./detector";
 import type { Failure, ScanResult, Snapshot } from "./types";
 export interface Progress {
@@ -11,10 +13,11 @@ export async function scan(
   minTurnover: number,
   signal: AbortSignal,
   onProgress: (p: Progress, result?: ScanResult) => void,
+  marketFilter: MarketFilter = "crypto",
 ) {
   const internal = new AbortController();
   const combined = AbortSignal.any([signal, internal.signal]);
-  const targets = await markets(minTurnover, combined),
+  const targets = await markets(minTurnover, combined, marketFilter),
     progress: Progress = {
       total: targets.length,
       completed: 0,
@@ -48,6 +51,7 @@ export async function scan(
           const error = e instanceof Error ? e : new Error(String(e));
           progress.errors.push({
             symbol: market.symbol,
+            symbolType: market.symbolType,
             message: error.message,
           });
           if (e instanceof ApiError && e.fatal) {
@@ -119,4 +123,31 @@ export async function loadSnapshot(signal: AbortSignal): Promise<Snapshot> {
     );
   }
   return validateSnapshot(data);
+}
+
+export function filterSnapshot(
+  snapshot: Snapshot,
+  filter: MarketFilter,
+  minTurnover: number,
+) {
+  if (filter !== "all" && snapshot.marketClassification !== "symbolType")
+    throw new Error(
+      "이 캐시에 시장 분류 정보가 없습니다. 전체로 검색하거나 Collect market data를 실행해 캐시를 갱신하세요.",
+    );
+  const entries = snapshot.entries.filter(
+    (e) =>
+      e.market.turnover >= minTurnover &&
+      matchesMarket(e.market.symbolType, filter),
+  );
+  const errors = snapshot.failed.filter((e) =>
+    matchesMarket(e.symbolType, filter),
+  );
+  return {
+    entries,
+    errors,
+    total:
+      filter === "all" ? snapshot.targetCount : entries.length + errors.length,
+    completed:
+      filter === "all" ? snapshot.completed : entries.length + errors.length,
+  };
 }
