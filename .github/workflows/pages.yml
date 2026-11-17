@@ -1,0 +1,50 @@
+name: Deploy Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Collect market data]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Restore latest public market snapshot if available
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow collect.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty' || true)
+          if [ -n "$run_id" ] && gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name market-cache --dir public/data; then
+            echo "Public cache restored"
+          else
+            echo "No previous cache; attempting fresh public API collection"
+            npm run collect || echo "Cache unavailable; UI will report this explicitly"
+          fi
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
