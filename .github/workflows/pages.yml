@@ -29,7 +29,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Restore latest public market snapshot if available
+      - name: Restore latest successful market snapshot if available
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -37,13 +37,7 @@ jobs:
           if [ -n "$run_id" ] && gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name market-cache --dir public/data; then
             echo "Public cache restored"
           else
-            echo "No previous cache; attempting fresh public API collection"
-            npm run collect || echo "Cache unavailable; UI will report this explicitly"
-          fi
-      - name: Refresh legacy cache classification
-        run: |
-          if [ -f public/data/market.json ] && ! node --input-type=module -e 'import fs from "node:fs"; process.exit(JSON.parse(fs.readFileSync("public/data/market.json", "utf8")).marketClassification === "symbolType" ? 0 : 1)'; then
-            npm run collect || echo "Legacy cache retained; UI requires fresh classification for coin/stock mode"
+            echo "Market cache unavailable; the app will show its existing cache error"
           fi
       - run: npm run build
       - uses: actions/configure-pages@v5
